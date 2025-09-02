@@ -1,8 +1,9 @@
 import pandas as pd
 from langchain.tools import tool
 from datetime import datetime, timedelta
-from app.config import PATIENT_CSV_PATH, SCHEDULE_XLSX_PATH
+from app.config import PATIENT_CSV_PATH, SCHEDULE_XLSX_PATH, FORMS_DIR, USE_REAL_EMAIL
 import json
+import os
 
 @tool
 def lookup_patient(first_name: str, last_name: str, dob: str) -> dict:
@@ -263,7 +264,55 @@ def send_intake_forms(booking_id: str, patient_name: str, patient_email: str, ap
     Returns confirmation of form delivery.
     """
     try:
-        # Simulate form sending
+        # Check if forms directory exists
+        if not os.path.exists(FORMS_DIR):
+            return f"Error: Forms directory not found at {FORMS_DIR}"
+        
+        # Get list of available form files
+        form_files = []
+        for file in os.listdir(FORMS_DIR):
+            if file.endswith(('.pdf', '.doc', '.docx')):
+                form_files.append(file)
+        
+        if not form_files:
+            return f"Error: No form files found in {FORMS_DIR}"
+        
+        # Read the main intake form PDF
+        main_form_path = os.path.join(FORMS_DIR, "New Patient Intake Form.pdf")
+        form_attachments = []
+        
+        if os.path.exists(main_form_path):
+            try:
+                with open(main_form_path, 'rb') as f:
+                    form_content = f.read()
+                    form_size = len(form_content)
+                    form_attachments.append({
+                        "filename": "New Patient Intake Form.pdf",
+                        "size": form_size,
+                        "content": form_content
+                    })
+                print(f"[FORM READ] Successfully read 'New Patient Intake Form.pdf' ({form_size} bytes)")
+            except Exception as e:
+                print(f"[FORM READ ERROR] Could not read main form: {str(e)}")
+        
+        # Read other available forms
+        for form_file in form_files:
+            if form_file != "New Patient Intake Form.pdf":
+                form_path = os.path.join(FORMS_DIR, form_file)
+                try:
+                    with open(form_path, 'rb') as f:
+                        form_content = f.read()
+                        form_size = len(form_content)
+                        form_attachments.append({
+                            "filename": form_file,
+                            "size": form_size,
+                            "content": form_content
+                        })
+                    print(f"[FORM READ] Successfully read '{form_file}' ({form_size} bytes)")
+                except Exception as e:
+                    print(f"[FORM READ ERROR] Could not read {form_file}: {str(e)}")
+        
+        # Prepare email content
         form_subject = f"Intake Forms for Your Appointment with {doctor_name} - {appointment_date}"
         form_body = f"""
 Dear {patient_name},
@@ -272,10 +321,14 @@ Thank you for booking your appointment with {doctor_name} on {appointment_date}.
 
 Please find attached the necessary intake forms that need to be completed before your visit:
 
-1. Patient Information Form
-2. Medical History Form
-3. Insurance Information Form
-4. Consent Forms
+"""
+        
+        # Add form list to email body
+        for i, attachment in enumerate(form_attachments, 1):
+            form_body += f"{i}. {attachment['filename']}\n"
+        
+        form_body += f"""
+Total forms attached: {len(form_attachments)}
 
 Please complete these forms and bring them to your appointment, or submit them online if the link is provided.
 
@@ -285,14 +338,57 @@ Best regards,
 MediCare Clinic Team
         """
         
-        # In production, this would use real email service
+        # Simulate email sending with actual form data
         print(f"[EMAIL] To: {patient_email}")
         print(f"[EMAIL] Subject: {form_subject}")
         print(f"[EMAIL] Body: {form_body}")
-        print(f"[EMAIL] Attachments: Patient Intake Form.pdf, Medical History Form.pdf")
+        print(f"[EMAIL] Attachments: {len(form_attachments)} files")
+        
+        for attachment in form_attachments:
+            print(f"[EMAIL] - {attachment['filename']} ({attachment['size']} bytes)")
+        
+        # Real email service integration (when USE_REAL_EMAIL=True)
+        if USE_REAL_EMAIL:
+            try:
+                from email.mime.multipart import MIMEMultipart
+                from email.mime.text import MIMEText
+                from email.mime.application import MIMEApplication
+                import smtplib
+                from app.config import SMTP_SERVER, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD
+                
+                # Create email message
+                msg = MIMEMultipart()
+                msg['From'] = SMTP_USERNAME
+                msg['To'] = patient_email
+                msg['Subject'] = form_subject
+                
+                # Add email body
+                msg.attach(MIMEText(form_body, 'plain'))
+                
+                # Attach form files
+                for attachment in form_attachments:
+                    pdf_attachment = MIMEApplication(attachment['content'], _subtype='pdf')
+                    pdf_attachment.add_header('Content-Disposition', 'attachment', 
+                                            filename=attachment['filename'])
+                    msg.attach(pdf_attachment)
+                
+                # Send email
+                server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+                server.starttls()
+                server.login(SMTP_USERNAME, SMTP_PASSWORD)
+                server.send_message(msg)
+                server.quit()
+                
+                print(f"[REAL EMAIL] Successfully sent email with {len(form_attachments)} attachments to {patient_email}")
+                
+            except Exception as e:
+                print(f"[REAL EMAIL ERROR] Failed to send email: {str(e)}")
+                # Fall back to simulation
+        else:
+            print("[EMAIL SIMULATION] Real email disabled - using simulation mode")
         
         return f"Success: Intake forms sent to {patient_email} for booking {booking_id}. " \
-               f"Forms include: Patient Information, Medical History, Insurance Information, and Consent Forms."
+               f"Attached {len(form_attachments)} form(s): {', '.join([att['filename'] for att in form_attachments])}"
     except Exception as e:
         return f"Error sending intake forms: {str(e)}"
 

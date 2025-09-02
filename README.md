@@ -158,6 +158,7 @@ AI_Medical_Appointment_Scheduling/
 │   │   ├── patients.csv       # Patient database (50 records)
 │   │   ├── schedules.xlsx     # Doctor availability
 │   │   └── forms/             # Intake form templates
+│   │       └── New Patient Intake Form.pdf # Actual PDF form
 │   ├── exports/               # Generated reports
 │   ├── config.py              # Configuration settings
 │   ├── main.py                # CLI interface
@@ -167,6 +168,24 @@ AI_Medical_Appointment_Scheduling/
 ├── requirements.txt          # Python dependencies
 └── README.md                 # This file
 ```
+
+## 📄 Form Integration Details
+
+### **PDF Form Processing**
+- **File Reading**: System reads actual PDF files from `app/data/forms/`
+- **Dynamic Discovery**: Automatically detects all PDF/DOC files in forms directory
+- **Content Validation**: Verifies file existence and reads file size
+- **Email Attachment**: Forms are properly attached to emails (when real email enabled)
+
+### **Form Types Supported**
+- ✅ **PDF Files** - Primary format for intake forms
+- ✅ **DOC/DOCX** - Microsoft Word documents
+- ✅ **Multiple Forms** - System handles multiple form files per email
+
+### **Email Integration**
+- **Simulation Mode** (Default): Console output with form details
+- **Real Email Mode**: Actual SMTP email with PDF attachments
+- **Configuration**: Toggle via `USE_REAL_EMAIL` environment variable
 
 ## 🔧 Configuration
 
@@ -219,6 +238,7 @@ TWILIO_AUTH_TOKEN=your_twilio_token
 ### **Integration Capabilities**
 - ✅ **CSV EMR Simulation** - Patient database with 50 records
 - ✅ **Excel Calendar Management** - Real-time booking updates
+- ✅ **PDF Form Integration** - Actual form reading and email attachment
 - ✅ **Email/SMS Communication** - Form delivery and reminders
 - ✅ **Admin Export** - Excel reports for review
 
