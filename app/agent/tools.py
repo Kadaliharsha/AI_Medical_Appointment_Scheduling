@@ -1,9 +1,29 @@
 import pandas as pd
 from langchain.tools import tool
 from datetime import datetime, timedelta
-from app.config import PATIENT_CSV_PATH, SCHEDULE_XLSX_PATH, FORMS_DIR, USE_REAL_EMAIL
+from app.config import PATIENT_CSV_PATH, SCHEDULE_XLSX_PATH, FORMS_DIR, USE_REAL_EMAIL, EXPORTS_DIR
 import json
 import os
+
+
+def _normalize_date_string(date_str: str) -> str:
+    """
+    Accept flexible human date inputs (e.g., "September 10, 2025", "2025/09/10")
+    and return canonical YYYY-MM-DD string. Falls back to original if parsing fails.
+    """
+    try:
+        # pandas is robust to many formats
+        parsed = pd.to_datetime(str(date_str), errors='raise')
+        return parsed.strftime('%Y-%m-%d')
+    except Exception:
+        # Last resort: try common formats
+        for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%m/%d/%Y", "%B %d, %Y", "%b %d, %Y"):
+            try:
+                parsed = datetime.strptime(str(date_str), fmt)
+                return parsed.strftime('%Y-%m-%d')
+            except Exception:
+                continue
+        return str(date_str)
 
 @tool
 def lookup_patient(first_name: str, last_name: str, dob: str) -> dict:
@@ -101,6 +121,7 @@ def get_calendly_availability(calendly_link: str, date: str) -> list:
         # Simulate Calendly API call by reading from our Excel schedule
         df = pd.read_excel(SCHEDULE_XLSX_PATH)
         df['date'] = df['date'].astype(str).str.split(' ').str[0]
+        date = _normalize_date_string(date)
         
         # Extract doctor name from Calendly link (simulation)
         # In real implementation, this would parse the Calendly link
@@ -121,7 +142,7 @@ def get_calendly_availability(calendly_link: str, date: str) -> list:
                     "slot_id": f"calendly_{idx}",
                     "start_time": str(slot['start_time']),
                     "end_time": str(slot['end_time']),
-                    "duration_minutes": 30,  # Default slot duration
+                    "duration_minutes": 30,  # Base slot duration in schedule
                     "available": True,
                     "calendly_link": calendly_link,
                     "doctor": slot['doctor'],
@@ -148,42 +169,321 @@ def book_calendly_slot(calendly_link: str, slot_id: str, patient_name: str, pati
         df['date'] = df['date'].astype(str).str.split(' ').str[0]
         df['start_time'] = df['start_time'].astype(str)
         
-        # Extract slot details from slot_id (simulation)
-        # In real implementation, this would use Calendly's booking API
+        # Handle merged 60-minute slot IDs: calendly_pair_i_j
+        if slot_id.startswith("calendly_pair_"):
+            try:
+                _, _, i_str, j_str = slot_id.split('_')
+                idx1 = int(i_str)
+                idx2 = int(j_str)
+            except Exception:
+                return "Error: Invalid merged slot ID format."
+
+            if idx1 in df.index and idx2 in df.index:
+                slot1 = df.loc[idx1]
+                slot2 = df.loc[idx2]
+                if (not bool(slot1['is_booked'])) and (not bool(slot2['is_booked'])):
+                    df.loc[idx1, 'is_booked'] = True
+                    df.loc[idx2, 'is_booked'] = True
+                    df.to_excel(SCHEDULE_XLSX_PATH, index=False)
+
+                    email_display = patient_email if patient_email else "your email"
+                    # Export admin record (60-minute merged)
+                    try:
+                        export_appointment.invoke({
+                            "booking_id": f"calendly_booking_{idx1}_{idx2}",
+                            "patient_name": patient_name,
+                            "patient_email": patient_email or "",
+                            "patient_phone": "",
+                            "doctor": str(slot1['doctor']),
+                            "date": str(slot1['date']),
+                            "start_time": str(slot1['start_time']),
+                            "end_time": str(slot2['end_time']),
+                            "duration_minutes": 60,
+                            "location": str(slot1['location'])
+                        })
+                    except Exception as _:
+                        pass
+
+                    return (
+                        f"Success: Calendly booking confirmed! Booking ID: calendly_booking_{idx1}_{idx2}. "
+                        f"Appointment with {slot1['doctor']} on {slot1['date']} from {slot1['start_time']} to {slot2['end_time']}. "
+                        f"Calendar invite has been sent to {email_display}."
+                    )
+                else:
+                    return "Error: One of the paired slots is already booked."
+            else:
+                return "Error: Paired slot indices not found."
+
+        # Extract single-slot index format: calendly_<index>
         try:
             slot_index = int(slot_id.split('_')[-1]) if '_' in slot_id else None
         except ValueError:
             return "Error: Invalid slot ID format."
-        
+
         if slot_index is not None and 0 <= slot_index < len(df):
             slot = df.iloc[slot_index]
-            
-            # Mark the slot as booked
+            if bool(slot['is_booked']):
+                return "Error: This slot is already booked."
+
             df.loc[slot_index, 'is_booked'] = True
             df.to_excel(SCHEDULE_XLSX_PATH, index=False)
-            
-            # Simulate Calendly confirmation
-            confirmation = {
-                "booking_id": f"calendly_booking_{slot_index}",
-                "patient_name": patient_name,
-                "doctor": slot['doctor'],
-                "date": slot['date'],
-                "start_time": str(slot['start_time']),
-                "end_time": str(slot['end_time']),
-                "location": slot['location'],
-                "calendly_link": calendly_link,
-                "confirmation_sent": True,
-                "calendar_invite_sent": True
-            }
-            
+
             email_display = patient_email if patient_email else "your email"
-            return f"Success: Calendly booking confirmed! Booking ID: {confirmation['booking_id']}. " \
-                   f"Appointment with {slot['doctor']} on {slot['date']} at {slot['start_time']}. " \
-                   f"Calendar invite has been sent to {email_display}."
+            # Export admin record (30-minute single)
+            try:
+                export_appointment.invoke({
+                    "booking_id": f"calendly_booking_{slot_index}",
+                    "patient_name": patient_name,
+                    "patient_email": patient_email or "",
+                    "patient_phone": "",
+                    "doctor": str(slot['doctor']),
+                    "date": str(slot['date']),
+                    "start_time": str(slot['start_time']),
+                    "end_time": str(slot['end_time']),
+                    "duration_minutes": 30,
+                    "location": str(slot['location'])
+                })
+            except Exception as _:
+                pass
+
+            return (
+                f"Success: Calendly booking confirmed! Booking ID: calendly_booking_{slot_index}. "
+                f"Appointment with {slot['doctor']} on {slot['date']} at {slot['start_time']}. "
+                f"Calendar invite has been sent to {email_display}."
+            )
         else:
             return "Error: Invalid slot ID or slot not available in Calendly."
     except Exception as e:
         return f"Calendly booking error: {str(e)}"
+
+@tool
+def get_calendly_availability_with_duration(calendly_link: str, date: str, required_duration_minutes: int, doctor_name: str = "") -> list:
+    """
+    Duration-aware Calendly availability. For 60-minute appointments, this merges
+    two consecutive 30-minute free slots into one 60-minute option.
+    Returns a list of slots in Calendly-like format. Slot IDs for merged pairs use
+    the form: "calendly_pair_{i}_{j}" where i and j are row indices in the schedule.
+    """
+    try:
+        df = pd.read_excel(SCHEDULE_XLSX_PATH)
+        df['date'] = df['date'].astype(str).str.split(' ').str[0]
+        date = _normalize_date_string(date)
+        # Determine doctor explicitly if provided; otherwise fall back to link heuristic
+        if not doctor_name:
+            doctor_name = "Dr. Sharma" if "sharma" in calendly_link.lower() else "Dr. Verma"
+
+        day_slots = df[(df['doctor'].str.lower() == doctor_name.lower()) & (df['date'] == date) & (df['is_booked'] == False)].copy()
+        if day_slots.empty:
+            return [{"message": "No available slots found for the specified date."}]
+
+        # Normalize times to datetime for sequencing
+        day_slots['start_time_str'] = day_slots['start_time'].astype(str)
+        day_slots['end_time_str'] = day_slots['end_time'].astype(str)
+        day_slots['start_dt'] = pd.to_datetime(day_slots['date'] + ' ' + day_slots['start_time_str'])
+        day_slots['end_dt'] = pd.to_datetime(day_slots['date'] + ' ' + day_slots['end_time_str'])
+        day_slots = day_slots.sort_values('start_dt')
+
+        results = []
+        if required_duration_minutes <= 30:
+            for idx, slot in day_slots.iterrows():
+                results.append({
+                    "slot_id": f"calendly_{idx}",
+                    "start_time": str(slot['start_time']),
+                    "end_time": str(slot['end_time']),
+                    "duration_minutes": 30,
+                    "available": True,
+                    "calendly_link": calendly_link,
+                    "doctor": slot['doctor'],
+                    "location": slot['location']
+                })
+            return results
+
+        # For 60 minutes: find consecutive pairs where end of first == start of second
+        indices = list(day_slots.index)
+        for i in range(len(indices) - 1):
+            idx1 = indices[i]
+            idx2 = indices[i + 1]
+            s1 = day_slots.loc[idx1]
+            s2 = day_slots.loc[idx2]
+            # Robust adjacency check: exact match on strings OR <= 1 minute gap
+            string_adjacent = str(s1['end_time_str']) == str(s2['start_time_str'])
+            time_gap = (s2['start_dt'] - s1['end_dt']).total_seconds()
+            near_adjacent = 0 <= time_gap <= 60  # allow up to 1 minute tolerance
+            if string_adjacent or near_adjacent:
+                results.append({
+                    "slot_id": f"calendly_pair_{idx1}_{idx2}",
+                    "start_time": str(s1['start_time']),
+                    "end_time": str(s2['end_time']),
+                    "duration_minutes": 60,
+                    "available": True,
+                    "calendly_link": calendly_link,
+                    "doctor": s1['doctor'],
+                    "location": s1['location']
+                })
+        if not results:
+            return [{"message": "No 60-minute continuous slots available. Please try another date."}]
+        return results
+    except Exception as e:
+        return [{"error": f"Calendly duration search error: {str(e)}"}]
+
+@tool
+def save_new_patient(first_name: str, last_name: str, dob: str, email: str = "", phone: str = "", preferred_doctor: str = "", location: str = "") -> str:
+    """
+    Persist a newly identified patient into patients.csv with duplicate protection.
+    A duplicate is same first+last (case-insensitive) and exact DOB (YYYY-MM-DD).
+    Adds fields if the CSV doesn't already contain them.
+    """
+    try:
+        # Normalize inputs
+        first = (first_name or "").strip()
+        last = (last_name or "").strip()
+        dob_norm = _normalize_date_string(dob or "").strip()
+        email = (email or "").strip()
+        phone = (phone or "").strip()
+        preferred_doctor = (preferred_doctor or "").strip()
+        location = (location or "").strip()
+
+        # Load existing or create new DataFrame
+        if os.path.exists(PATIENT_CSV_PATH):
+            df = pd.read_csv(PATIENT_CSV_PATH)
+        else:
+            df = pd.DataFrame(columns=[
+                'first_name','last_name','dob','email','phone','preferred_doctor','location','created_at'
+            ])
+
+        # Prepare for case-insensitive match; handle missing columns gracefully
+        if 'first_name' in df.columns and 'last_name' in df.columns and 'dob' in df.columns:
+            mask = (
+                df['first_name'].astype(str).str.lower() == first.lower()
+            ) & (
+                df['last_name'].astype(str).str.lower() == last.lower()
+            ) & (
+                df['dob'].astype(str) == dob_norm
+            )
+            if df[mask].shape[0] > 0:
+                return f"Info: Patient {first} {last} ({dob_norm}) already exists. No action needed."
+
+        # Build new row
+        new_row = {
+            'first_name': first,
+            'last_name': last,
+            'dob': dob_norm,
+            'email': email,
+            'phone': phone,
+            'preferred_doctor': preferred_doctor,
+            'location': location,
+            'created_at': datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'),
+        }
+
+        # Ensure all columns exist; extend df columns if needed
+        for key in new_row.keys():
+            if key not in df.columns:
+                df[key] = ""
+
+        # Append row and save
+        df = df.reindex(columns=list(df.columns))
+        row_df = pd.DataFrame([{col: new_row.get(col, "") for col in df.columns}])
+        df = pd.concat([df, row_df], ignore_index=True)
+        df.to_csv(PATIENT_CSV_PATH, index=False)
+
+        return f"Success: Added new patient {first} {last} ({dob_norm}) to the EMR."
+    except Exception as e:
+        return f"Error saving new patient: {str(e)}"
+
+@tool
+def export_appointment(booking_id: str, patient_name: str, patient_email: str, patient_phone: str, doctor: str, date: str, start_time: str, end_time: str, duration_minutes: int, location: str) -> str:
+    """
+    Append a confirmed appointment to app/exports/appointments.xlsx.
+    Creates the file with headers if missing.
+    """
+    try:
+        os.makedirs(EXPORTS_DIR, exist_ok=True)
+        export_path = os.path.join(EXPORTS_DIR, 'appointments.xlsx')
+
+        required_cols = [
+            'booking_id', 'patient_name', 'patient_email', 'patient_phone',
+            'doctor', 'location', 'date', 'start_time', 'end_time',
+            'duration_minutes', 'created_at'
+        ]
+
+        record = {
+            'booking_id': str(booking_id),
+            'patient_name': str(patient_name),
+            'patient_email': str(patient_email or ''),
+            'patient_phone': str(patient_phone or ''),
+            'doctor': str(doctor),
+            'location': str(location or ''),
+            'date': _normalize_date_string(date),
+            'start_time': str(start_time),
+            'end_time': str(end_time),
+            'duration_minutes': int(duration_minutes),
+            'created_at': datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'),
+        }
+
+        if os.path.exists(export_path):
+            existing = pd.read_excel(export_path)
+            # Normalize existing to required schema only
+            for col in required_cols:
+                if col not in existing.columns:
+                    existing[col] = ''
+            existing = existing[required_cols]
+        else:
+            existing = pd.DataFrame(columns=required_cols)
+
+        new_row = pd.DataFrame([[record[c] for c in required_cols]], columns=required_cols)
+        out_df = pd.concat([existing, new_row], ignore_index=True)
+
+        with pd.ExcelWriter(export_path, engine='openpyxl', mode='w') as writer:
+            out_df.to_excel(writer, index=False)
+        return f"Success: Exported booking {booking_id} to appointments.xlsx"
+    except Exception as e:
+        return f"Error exporting appointment: {str(e)}"
+
+@tool
+def build_admin_report(start_date: str, end_date: str) -> str:
+    """
+    Build an admin summary report (appointments_report.xlsx) for a date range.
+    Summary tab by date and doctor; Raw tab with filtered rows.
+    """
+    try:
+        export_path = os.path.join(EXPORTS_DIR, 'appointments.xlsx')
+        if not os.path.exists(export_path):
+            return "Error: No appointments.xlsx found to build a report."
+
+        df = pd.read_excel(export_path)
+        if df.empty:
+            return "Error: appointments.xlsx has no rows."
+
+        s = _normalize_date_string(start_date)
+        e = _normalize_date_string(end_date)
+
+        df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
+        mask = (df['date'] >= s) & (df['date'] <= e)
+        filt = df[mask].copy()
+        if filt.empty:
+            return f"Info: No appointments between {s} and {e}."
+
+        # Convert duration to numeric
+        filt['duration_minutes'] = pd.to_numeric(filt['duration_minutes'], errors='coerce').fillna(0).astype(int)
+
+        # Summary by date/doctor
+        summary = (
+            filt.groupby(['date', 'doctor'])
+            .agg(total_appointments=('booking_id', 'count'),
+                 total_minutes_booked=('duration_minutes', 'sum'),
+                 avg_duration_minutes=('duration_minutes', 'mean'))
+            .reset_index()
+        )
+        summary['avg_duration_minutes'] = summary['avg_duration_minutes'].round(1)
+
+        report_path = os.path.join(EXPORTS_DIR, 'appointments_report.xlsx')
+        with pd.ExcelWriter(report_path, engine='openpyxl', mode='w') as writer:
+            summary.to_excel(writer, index=False, sheet_name='Summary')
+            filt.to_excel(writer, index=False, sheet_name='Raw')
+
+        return f"Success: Admin report saved to {report_path}"
+    except Exception as e:
+        return f"Error building report: {str(e)}"
 
 @tool
 def schedule_enhanced_reminders(booking_id: str, patient_name: str, appointment_date: str, appointment_time: str, doctor_name: str, patient_email: str = "", patient_phone: str = "") -> str:
@@ -264,6 +564,10 @@ def send_intake_forms(booking_id: str, patient_name: str, patient_email: str, ap
     Returns confirmation of form delivery.
     """
     try:
+        # Require a valid recipient email
+        if not patient_email or '@' not in patient_email:
+            return "Error: A valid patient_email is required to send intake forms. Please provide and confirm the patient's email address."
+
         # Check if forms directory exists
         if not os.path.exists(FORMS_DIR):
             return f"Error: Forms directory not found at {FORMS_DIR}"
@@ -392,7 +696,16 @@ MediCare Clinic Team
     except Exception as e:
         return f"Error sending intake forms: {str(e)}"
 
-# A list containing all the tools we've created.
-# This will be used by our agent graph to know what actions it can perform.
-all_tools = [lookup_patient, get_calendly_availability, book_calendly_slot, schedule_enhanced_reminders, send_intake_forms, find_available_slots, book_appointment]
+all_tools = [
+    lookup_patient,
+    get_calendly_availability_with_duration,  # duration-aware availability (authoritative)
+    book_calendly_slot,
+    save_new_patient,
+    export_appointment,
+    build_admin_report,
+    schedule_enhanced_reminders,
+    send_intake_forms,
+    find_available_slots,
+    book_appointment,
+]
 
