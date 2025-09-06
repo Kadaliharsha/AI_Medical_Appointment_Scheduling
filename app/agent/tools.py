@@ -1,8 +1,7 @@
 import pandas as pd
 from langchain.tools import tool
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from app.config import PATIENT_CSV_PATH, SCHEDULE_XLSX_PATH, FORMS_DIR, USE_REAL_EMAIL, EXPORTS_DIR
-import json
 import os
 
 
@@ -34,127 +33,26 @@ def lookup_patient(first_name: str, last_name: str, dob: str) -> dict:
     """
     try:
         df = pd.read_csv(PATIENT_CSV_PATH)
-        # Search for a matching patient, ignoring case for names
+        # Normalize and strip all relevant fields in both input and CSV
+        def norm(s):
+            return str(s).strip().lower()
+        input_first = norm(first_name)
+        input_last = norm(last_name)
+        input_dob = str(dob).strip()
+        df['first_name_norm'] = df['first_name'].astype(str).str.strip().str.lower()
+        df['last_name_norm'] = df['last_name'].astype(str).str.strip().str.lower()
+        df['dob_norm'] = df['dob'].astype(str).str.strip()
         patient = df[
-            (df['first_name'].str.lower() == first_name.lower()) &
-            (df['last_name'].str.lower() == last_name.lower()) &
-            (df['dob'] == dob)
+            (df['first_name_norm'] == input_first) &
+            (df['last_name_norm'] == input_last) &
+            (df['dob_norm'] == input_dob)
         ]
-        
         if not patient.empty:
-            return patient.to_dict('records')[0]
+            return patient.drop(columns=['first_name_norm','last_name_norm','dob_norm']).to_dict('records')[0]
         else:
             return {"message": "Patient not found. This is a new patient."}
     except Exception as e:
         return {"error": f"An error occurred while looking up the patient: {str(e)}"}
-
-@tool
-def find_available_slots(doctor_name: str, date: str) -> list:
-    """
-    Finds all available (is_booked=False) appointment slots for a given doctor
-    on a specific date (YYYY-MM-DD) from the schedules.xlsx file.
-    Returns a list of available time slots.
-    """
-    try:
-        df = pd.read_excel(SCHEDULE_XLSX_PATH)
-        # Ensure date column is treated as a string for reliable matching
-        df['date'] = df['date'].astype(str).str.split(' ').str[0]
-        
-        # Filter for the doctor on the specified date with available slots
-        available_slots = df[
-            (df['doctor'].str.lower() == doctor_name.lower()) &
-            (df['date'] == date) &
-            (df['is_booked'] == False)
-        ]
-        
-        if not available_slots.empty:
-            # Convert time objects to strings for clean output
-            slots_list = available_slots[['start_time', 'end_time']].to_dict('records')
-            for slot in slots_list:
-                slot['start_time'] = str(slot['start_time'])
-                slot['end_time'] = str(slot['end_time'])
-            return slots_list
-        else:
-            return [{"message": "No available slots found for the specified doctor and date."}]
-    except Exception as e:
-        return [{"error": f"An error occurred while finding slots: {str(e)}"}]
-
-@tool
-def book_appointment(doctor_name: str, date: str, start_time: str) -> str:
-    """
-    Books an appointment by marking the slot as booked (is_booked=True) in the
-    schedules.xlsx file for the specified doctor, date, and start time (HH:MM:SS).
-    Returns a confirmation message.
-    """
-    try:
-        df = pd.read_excel(SCHEDULE_XLSX_PATH)
-        df['date'] = df['date'].astype(str).str.split(' ').str[0]
-        df['start_time'] = df['start_time'].astype(str)
-        
-        # Find the specific slot to book
-        slot_index = df[
-            (df['doctor'].str.lower() == doctor_name.lower()) &
-            (df['date'] == date) &
-            (df['start_time'] == start_time) &
-            (df['is_booked'] == False)
-        ].index
-        
-        if not slot_index.empty:
-            # Mark the slot as booked and save the file
-            df.loc[slot_index, 'is_booked'] = True
-            df.to_excel(SCHEDULE_XLSX_PATH, index=False)
-            return f"Success: Appointment with {doctor_name} on {date} at {start_time} has been booked."
-        else:
-            return "Error: The selected slot is not available or does not exist. Please check the details and try again."
-    except Exception as e:
-        return f"An error occurred while booking the appointment: {str(e)}"
-
-@tool
-def get_calendly_availability(calendly_link: str, date: str) -> list:
-    """
-    Simulates Calendly integration to get available appointment slots.
-    This tool connects to the Calendly calendar and returns available time slots
-    for the specified date. The calendly_link should be the doctor's Calendly URL.
-    Returns a list of available time slots in Calendly format.
-    """
-    try:
-        # Simulate Calendly API call by reading from our Excel schedule
-        df = pd.read_excel(SCHEDULE_XLSX_PATH)
-        df['date'] = df['date'].astype(str).str.split(' ').str[0]
-        date = _normalize_date_string(date)
-        
-        # Extract doctor name from Calendly link (simulation)
-        # In real implementation, this would parse the Calendly link
-        doctor_name = "Dr. Sharma" if "sharma" in calendly_link.lower() else "Dr. Verma"
-        
-        # Filter for the doctor on the specified date with available slots
-        available_slots = df[
-            (df['doctor'].str.lower() == doctor_name.lower()) &
-            (df['date'] == date) &
-            (df['is_booked'] == False)
-        ]
-        
-        if not available_slots.empty:
-            # Format response to look like Calendly API
-            calendly_slots = []
-            for idx, slot in available_slots.iterrows():
-                calendly_slot = {
-                    "slot_id": f"calendly_{idx}",
-                    "start_time": str(slot['start_time']),
-                    "end_time": str(slot['end_time']),
-                    "duration_minutes": 30,  # Base slot duration in schedule
-                    "available": True,
-                    "calendly_link": calendly_link,
-                    "doctor": slot['doctor'],
-                    "location": slot['location']
-                }
-                calendly_slots.append(calendly_slot)
-            
-            return calendly_slots
-        else:
-            return [{"message": "No available slots found in Calendly for the specified date."}]
-    except Exception as e:
-        return [{"error": f"Calendly API error: {str(e)}"}]
 
 @tool
 def book_calendly_slot(calendly_link: str, slot_id: str, patient_name: str, patient_email: str = "") -> str:
@@ -187,10 +85,12 @@ def book_calendly_slot(calendly_link: str, slot_id: str, patient_name: str, pati
                     df.to_excel(SCHEDULE_XLSX_PATH, index=False)
 
                     email_display = patient_email if patient_email else "your email"
+                    booking_id = f"calendly_booking_{idx1}_{idx2}"
+                    
                     # Export admin record (60-minute merged)
                     try:
                         export_appointment.invoke({
-                            "booking_id": f"calendly_booking_{idx1}_{idx2}",
+                            "booking_id": booking_id,
                             "patient_name": patient_name,
                             "patient_email": patient_email or "",
                             "patient_phone": "",
@@ -204,10 +104,28 @@ def book_calendly_slot(calendly_link: str, slot_id: str, patient_name: str, pati
                     except Exception as _:
                         pass
 
+                    # Automatically send intake forms if email is provided
+                    forms_message = ""
+                    if patient_email and '@' in patient_email:
+                        try:
+                            forms_result = send_intake_forms.invoke({
+                                "booking_id": booking_id,
+                                "patient_name": patient_name,
+                                "patient_email": patient_email,
+                                "appointment_date": str(slot1['date']),
+                                "doctor_name": str(slot1['doctor'])
+                            })
+                            if "Success" in forms_result:
+                                forms_message = " Intake forms have been sent to your email."
+                            else:
+                                forms_message = f" Note: {forms_result}"
+                        except Exception as e:
+                            forms_message = f" Note: Could not send intake forms: {str(e)}"
+
                     return (
-                        f"Success: Calendly booking confirmed! Booking ID: calendly_booking_{idx1}_{idx2}. "
+                        f"Success: Calendly booking confirmed! Booking ID: {booking_id}. "
                         f"Appointment with {slot1['doctor']} on {slot1['date']} from {slot1['start_time']} to {slot2['end_time']}. "
-                        f"Calendar invite has been sent to {email_display}."
+                        f"Calendar invite has been sent to {email_display}.{forms_message}"
                     )
                 else:
                     return "Error: One of the paired slots is already booked."
@@ -229,10 +147,12 @@ def book_calendly_slot(calendly_link: str, slot_id: str, patient_name: str, pati
             df.to_excel(SCHEDULE_XLSX_PATH, index=False)
 
             email_display = patient_email if patient_email else "your email"
+            booking_id = f"calendly_booking_{slot_index}"
+            
             # Export admin record (30-minute single)
             try:
                 export_appointment.invoke({
-                    "booking_id": f"calendly_booking_{slot_index}",
+                    "booking_id": booking_id,
                     "patient_name": patient_name,
                     "patient_email": patient_email or "",
                     "patient_phone": "",
@@ -246,10 +166,28 @@ def book_calendly_slot(calendly_link: str, slot_id: str, patient_name: str, pati
             except Exception as _:
                 pass
 
+            # Automatically send intake forms if email is provided
+            forms_message = ""
+            if patient_email and '@' in patient_email:
+                try:
+                    forms_result = send_intake_forms.invoke({
+                        "booking_id": booking_id,
+                        "patient_name": patient_name,
+                        "patient_email": patient_email,
+                        "appointment_date": str(slot['date']),
+                        "doctor_name": str(slot['doctor'])
+                    })
+                    if "Success" in forms_result:
+                        forms_message = " Intake forms have been sent to your email."
+                    else:
+                        forms_message = f" Note: {forms_result}"
+                except Exception as e:
+                    forms_message = f" Note: Could not send intake forms: {str(e)}"
+
             return (
-                f"Success: Calendly booking confirmed! Booking ID: calendly_booking_{slot_index}. "
+                f"Success: Calendly booking confirmed! Booking ID: {booking_id}. "
                 f"Appointment with {slot['doctor']} on {slot['date']} at {slot['start_time']}. "
-                f"Calendar invite has been sent to {email_display}."
+                f"Calendar invite has been sent to {email_display}.{forms_message}"
             )
         else:
             return "Error: Invalid slot ID or slot not available in Calendly."
@@ -267,7 +205,25 @@ def get_calendly_availability_with_duration(calendly_link: str, date: str, requi
     try:
         df = pd.read_excel(SCHEDULE_XLSX_PATH)
         df['date'] = df['date'].astype(str).str.split(' ').str[0]
-        date = _normalize_date_string(date)
+        date_str = _normalize_date_string(date)
+        # Use datetime objects for robust comparison
+        try:
+            requested_date = datetime.strptime(date_str, '%Y-%m-%d')
+            today_date = datetime.today().replace(hour=0, minute=0, second=0, microsecond=0)
+            print(f"[DEBUG] Date comparison: date_str={date_str}, requested_date={requested_date}, today_date={today_date}")
+            if requested_date < today_date:
+                user_date = requested_date.strftime('%B %d, %Y')
+                print(f"[DEBUG] Date rejected: requested_date < today_date")
+                return [{"error": f"{user_date} is in the past. Please choose today or a future date."}]
+        except Exception as e:
+            print(f"[DEBUG] Date parsing error: {e}, date_str={date_str}")
+            # If parsing fails, fallback to string comparison
+            today_str = datetime.today().strftime('%Y-%m-%d')
+            print(f"[DEBUG] String comparison: date_str={date_str}, today_str={today_str}")
+            if isinstance(date_str, str) and date_str < today_str:
+                user_date = date_str
+                print(f"[DEBUG] Date rejected (string): date_str < today_str")
+                return [{"error": f"{user_date} is in the past. Please choose today or a future date."}]
         # Determine doctor explicitly if provided; otherwise fall back to link heuristic
         if not doctor_name:
             doctor_name = "Dr. Sharma" if "sharma" in calendly_link.lower() else "Dr. Verma"
@@ -342,6 +298,10 @@ def save_new_patient(first_name: str, last_name: str, dob: str, email: str = "",
         phone = (phone or "").strip()
         preferred_doctor = (preferred_doctor or "").strip()
         location = (location or "").strip()
+        # Define missing fields as empty strings
+        insurance_carrier = ""
+        member_id = ""
+        group_id = ""
 
         # Load existing or create new DataFrame
         if os.path.exists(PATIENT_CSV_PATH):
@@ -361,7 +321,21 @@ def save_new_patient(first_name: str, last_name: str, dob: str, email: str = "",
                 df['dob'].astype(str) == dob_norm
             )
             if df[mask].shape[0] > 0:
-                return f"Info: Patient {first} {last} ({dob_norm}) already exists. No action needed."
+                # Update missing details for existing patient
+                update_fields = {
+                    'email': email,
+                    'phone': phone,
+                    'preferred_doctor': preferred_doctor,
+                    'location': location,
+                    'insurance_carrier': insurance_carrier,
+                    'member_id': member_id,
+                    'group_id': group_id
+                }
+                for field, value in update_fields.items():
+                    if value:
+                        df.loc[mask, field] = value
+                df.to_csv(PATIENT_CSV_PATH, index=False)
+                return f"Success: Updated details for existing patient {first} {last} ({dob_norm}) in the EMR."
 
         # Build new row
         new_row = {
@@ -372,7 +346,10 @@ def save_new_patient(first_name: str, last_name: str, dob: str, email: str = "",
             'phone': phone,
             'preferred_doctor': preferred_doctor,
             'location': location,
-            'created_at': datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'),
+            'insurance_carrier': insurance_carrier,
+            'member_id': member_id,
+            'group_id': group_id,
+            'created_at': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
         }
 
         # Ensure all columns exist; extend df columns if needed
@@ -417,7 +394,7 @@ def export_appointment(booking_id: str, patient_name: str, patient_email: str, p
             'start_time': str(start_time),
             'end_time': str(end_time),
             'duration_minutes': int(duration_minutes),
-            'created_at': datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'),
+            'created_at': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
         }
 
         if os.path.exists(export_path):
@@ -557,12 +534,62 @@ def schedule_enhanced_reminders(booking_id: str, patient_name: str, appointment_
         return f"Error scheduling reminders: {str(e)}"
 
 @tool
+def validate_email_config() -> str:
+    """
+    Validates the email configuration and provides setup instructions.
+    This tool checks if SMTP settings are properly configured for sending emails.
+    Returns a status report with configuration details and setup instructions.
+    """
+    try:
+        from app.config import USE_REAL_EMAIL, SMTP_SERVER, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD
+        
+        config_status = {
+            "USE_REAL_EMAIL": USE_REAL_EMAIL,
+            "SMTP_SERVER": SMTP_SERVER,
+            "SMTP_PORT": SMTP_PORT,
+            "SMTP_USERNAME": "SET" if SMTP_USERNAME else "MISSING",
+            "SMTP_PASSWORD": "SET" if SMTP_PASSWORD else "MISSING"
+        }
+        
+        issues = []
+        if not USE_REAL_EMAIL:
+            issues.append("Real email is disabled (USE_REAL_EMAIL=0)")
+        if not SMTP_USERNAME:
+            issues.append("SMTP username not set")
+        if not SMTP_PASSWORD:
+            issues.append("SMTP password not set")
+        
+        status_report = f"Email Configuration Status:\n"
+        for key, value in config_status.items():
+            status_report += f"- {key}: {value}\n"
+        
+        if issues:
+            status_report += f"\nIssues found:\n"
+            for issue in issues:
+                status_report += f"- {issue}\n"
+            
+            status_report += f"\nTo fix these issues, add the following to your .env file:\n"
+            status_report += f"USE_REAL_EMAIL=1\n"
+            status_report += f"SMTP_SERVER={SMTP_SERVER}\n"
+            status_report += f"SMTP_PORT={SMTP_PORT}\n"
+            status_report += f"SMTP_USERNAME=your_email@gmail.com\n"
+            status_report += f"SMTP_PASSWORD=your_app_password\n"
+            status_report += f"\nNote: For Gmail, you need to use an App Password, not your regular password."
+        else:
+            status_report += f"\n✅ Email configuration looks good!"
+        
+        return status_report
+    except Exception as e:
+        return f"Error validating email configuration: {str(e)}"
+
+@tool
 def send_intake_forms(booking_id: str, patient_name: str, patient_email: str, appointment_date: str, doctor_name: str) -> str:
     """
     Sends patient intake forms via email after appointment confirmation.
     This tool emails the necessary intake forms to the patient.
     Returns confirmation of form delivery.
     """
+    print(f"[DEBUG] send_intake_forms called for booking_id={booking_id}, patient_email={patient_email}")
     try:
         # Require a valid recipient email
         if not patient_email or '@' not in patient_email:
@@ -653,12 +680,20 @@ MediCare Clinic Team
         
         # Real email service integration (when USE_REAL_EMAIL=True)
         if USE_REAL_EMAIL:
+            print(f"[REAL EMAIL BLOCK] USE_REAL_EMAIL is True. Attempting to send real email...")
+            
+            # Validate SMTP configuration
+            from app.config import SMTP_SERVER, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD
+            if not SMTP_USERNAME or not SMTP_PASSWORD:
+                print(f"[REAL EMAIL ERROR] SMTP credentials not configured. SMTP_USERNAME: {'SET' if SMTP_USERNAME else 'MISSING'}, SMTP_PASSWORD: {'SET' if SMTP_PASSWORD else 'MISSING'}")
+                return f"Error: Email configuration incomplete. SMTP credentials not properly set. Please check your .env file."
+            
             try:
                 from email.mime.multipart import MIMEMultipart
                 from email.mime.text import MIMEText
                 from email.mime.application import MIMEApplication
                 import smtplib
-                from app.config import SMTP_SERVER, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD
+                import time
                 
                 # Create email message
                 msg = MIMEMultipart()
@@ -676,18 +711,68 @@ MediCare Clinic Team
                                             filename=attachment['filename'])
                     msg.attach(pdf_attachment)
                 
-                # Send email
-                server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-                server.starttls()
-                server.login(SMTP_USERNAME, SMTP_PASSWORD)
-                server.send_message(msg)
-                server.quit()
+                # Retry logic for email sending
+                max_retries = 3
+                retry_delay = 2  # seconds
                 
-                print(f"[REAL EMAIL] Successfully sent email with {len(form_attachments)} attachments to {patient_email}")
+                for attempt in range(max_retries):
+                    try:
+                        print(f"[REAL EMAIL] Attempt {attempt + 1}/{max_retries} - Connecting to {SMTP_SERVER}:{SMTP_PORT}")
+                        
+                        # Create SMTP connection with timeout
+                        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=30)
+                        server.set_debuglevel(0)  # Set to 1 for debug output
+                        
+                        # Enable TLS
+                        server.starttls()
+                        
+                        # Login with credentials
+                        server.login(SMTP_USERNAME, SMTP_PASSWORD)
+                        
+                        # Send the email
+                        server.send_message(msg)
+                        server.quit()
+                        
+                        print(f"[REAL EMAIL] Successfully sent email with {len(form_attachments)} attachments to {patient_email}")
+                        break  # Success, exit retry loop
+                        
+                    except smtplib.SMTPAuthenticationError as e:
+                        print(f"[REAL EMAIL ERROR] Authentication failed: {str(e)}")
+                        return f"Error: Email authentication failed. Please check your SMTP username and password in the .env file."
+                    except smtplib.SMTPRecipientsRefused as e:
+                        print(f"[REAL EMAIL ERROR] Recipient refused: {str(e)}")
+                        return f"Error: Email address {patient_email} was refused by the server. Please verify the email address."
+                    except smtplib.SMTPServerDisconnected as e:
+                        print(f"[REAL EMAIL ERROR] Server disconnected: {str(e)}")
+                        if attempt < max_retries - 1:
+                            print(f"[REAL EMAIL] Retrying in {retry_delay} seconds...")
+                            time.sleep(retry_delay)
+                            retry_delay *= 2  # Exponential backoff
+                        else:
+                            return f"Error: Email server connection failed after {max_retries} attempts. Please check your internet connection and SMTP settings."
+                    except smtplib.SMTPException as e:
+                        print(f"[REAL EMAIL ERROR] SMTP error: {str(e)}")
+                        if attempt < max_retries - 1:
+                            print(f"[REAL EMAIL] Retrying in {retry_delay} seconds...")
+                            time.sleep(retry_delay)
+                            retry_delay *= 2
+                        else:
+                            return f"Error: Email sending failed after {max_retries} attempts. SMTP error: {str(e)}"
+                    except Exception as e:
+                        print(f"[REAL EMAIL ERROR] Unexpected error: {str(e)}")
+                        if attempt < max_retries - 1:
+                            print(f"[REAL EMAIL] Retrying in {retry_delay} seconds...")
+                            time.sleep(retry_delay)
+                            retry_delay *= 2
+                        else:
+                            return f"Error: Email sending failed after {max_retries} attempts. Error: {str(e)}"
+                else:
+                    # This runs if the for loop completes without breaking
+                    return f"Error: Email sending failed after {max_retries} attempts. Please try again later or contact support."
                 
             except Exception as e:
-                print(f"[REAL EMAIL ERROR] Failed to send email: {str(e)}")
-                # Fall back to simulation
+                print(f"[REAL EMAIL ERROR] Critical error: {str(e)}")
+                return f"Error: Critical email error: {str(e)}"
         else:
             print("[EMAIL SIMULATION] Real email disabled - using simulation mode")
         
@@ -704,8 +789,6 @@ all_tools = [
     export_appointment,
     build_admin_report,
     schedule_enhanced_reminders,
+    validate_email_config,
     send_intake_forms,
-    find_available_slots,
-    book_appointment,
 ]
-

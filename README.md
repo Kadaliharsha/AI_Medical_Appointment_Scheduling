@@ -208,14 +208,11 @@ AI_Medical_Appointment_Scheduling/
 # Required - get this from OpenAI
 OPENAI_API_KEY=your_openai_api_key
 
-# Optional - for real email/SMS (defaults to simulation)
+# Optional - for real email (defaults to simulation)
 USE_REAL_EMAIL=0
-USE_REAL_SMS=0
 SMTP_SERVER=smtp.gmail.com
 SMTP_USERNAME=your_email
 SMTP_PASSWORD=your_password
-TWILIO_ACCOUNT_SID=your_twilio_sid
-TWILIO_AUTH_TOKEN=your_twilio_token
 ```
 
 ### Data Sources

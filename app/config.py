@@ -25,16 +25,10 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 # We will use an OpenAI model now
 AGENT_MODEL_NAME = "gpt-4o-mini"
 
-# --- Messaging Configuration (use mocks by default) ---
+# --- Email Configuration ---
 USE_REAL_EMAIL = os.getenv("USE_REAL_EMAIL", "0") == "1"
-USE_REAL_SMS = os.getenv("USE_REAL_SMS", "0") == "1"
 
 SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
 SMTP_USERNAME = os.getenv("SMTP_USERNAME", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-
-TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID", "")
-TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
-TWILIO_FROM_NUMBER = os.getenv("TWILIO_FROM_NUMBER", "")
-

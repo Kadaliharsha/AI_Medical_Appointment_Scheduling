@@ -2,8 +2,6 @@ import streamlit as st
 import sys
 import os
 from dotenv import load_dotenv
-import pandas as pd
-from datetime import datetime, timedelta
 import json
 
 # Add project root to path
@@ -202,7 +200,43 @@ def get_ai_response(user_input):
         )
         model_with_tools = model.bind_tools(all_tools)
         
-        # Add user message to conversation
+        # Parse insurance details if user provides them
+        import re
+        # Flexible insurance parsing: look for keywords and values in any order
+        carrier = member_id = group_id = None
+        carrier_match = re.search(r'(?:insurance\s*carrier|carrier)[:\s]+is\s+([\w\s\-]+?)(?:,|\.|$)', user_input, re.IGNORECASE)
+        member_id_match = re.search(r'(?:member\s*id|id)[:\s]+is\s+([\w\-]+?)(?:,|\.|$)', user_input, re.IGNORECASE)
+        group_id_match = re.search(r'(?:group\s*id|group)[:\s]+is\s+([\w\-]+?)(?:,|\.|$)', user_input, re.IGNORECASE)
+        if carrier_match:
+            carrier = carrier_match.group(1).strip()
+        if member_id_match:
+            member_id = member_id_match.group(1).strip()
+        if group_id_match:
+            group_id = group_id_match.group(1).strip()
+        # Only update if at least one field is found
+        if carrier or member_id or group_id:
+            insurance = st.session_state.patient_details.get('insurance', {})
+            if carrier:
+                insurance['carrier'] = carrier
+            if member_id:
+                insurance['member_id'] = member_id
+            if group_id:
+                insurance['group_id'] = group_id
+            st.session_state.patient_details['insurance'] = insurance
+
+        # Ensure insurance details are passed to save_new_patient tool
+        # Find the last tool call for save_new_patient and inject insurance details if present
+        if st.session_state.conversation_history:
+            last_tool_call = None
+            for msg in reversed(st.session_state.conversation_history):
+                if isinstance(msg, ToolMessage) and 'save_new_patient' in msg.content:
+                    last_tool_call = msg
+                    break
+            if last_tool_call and 'insurance' in st.session_state.patient_details:
+                # This is a simplified patch: in a real agent, you'd update the tool_args for save_new_patient
+                # Here, just log that insurance would be passed
+                print(f"[DEBUG] Insurance details to be saved: {st.session_state.patient_details['insurance']}")
+    # Add user message to conversation
         st.session_state.conversation_history.append(HumanMessage(content=user_input))
         
         # Get AI response
@@ -232,6 +266,31 @@ def get_ai_response(user_input):
                     except:
                         tool_args = {}
                     
+                    # Inject insurance details into save_new_patient tool call
+                    if tool_name == 'save_new_patient':
+                        insurance = st.session_state.patient_details.get('insurance', {}) if 'insurance' in st.session_state.patient_details else {}
+                        if insurance:
+                            # Map to expected argument names
+                            if 'carrier' in insurance:
+                                tool_args['insurance_carrier'] = insurance['carrier']
+                            if 'member_id' in insurance:
+                                tool_args['member_id'] = insurance['member_id']
+                            if 'group_id' in insurance:
+                                tool_args['group_id'] = insurance['group_id']
+                    # Insurance check before sending forms/reminders
+                    if tool_name in ['send_intake_forms', 'schedule_enhanced_reminders']:
+                        insurance = st.session_state.patient_details.get('insurance', {}) if 'insurance' in st.session_state.patient_details else {}
+                        missing_fields = []
+                        for field in ['carrier', 'member_id', 'group_id']:
+                            if not insurance.get(field):
+                                missing_fields.append(field)
+                        if missing_fields:
+                            tool_message = ToolMessage(
+                                content=f"Missing insurance details: {', '.join(missing_fields)}. Please provide carrier, member ID, and group ID before proceeding.",
+                                tool_call_id=tool_call.get('id', '')
+                            )
+                            tool_messages.append(tool_message)
+                            continue
                     # Find and execute the tool
                     tool_func = None
                     for tool in all_tools:
@@ -283,28 +342,45 @@ def get_ai_response(user_input):
 def display_conversation():
     """Display the conversation history"""
     # Render messages
-    
+
+    import re
+    def format_time(text):
+        # Find times like HH:MM or H:MM and add AM/PM if missing
+        def repl(match):
+            time_str = match.group(0)
+            # If already has AM/PM at the end, return as is
+            if re.search(r'(am|pm)\s*$', time_str, re.IGNORECASE):
+                return time_str
+            # Try to parse hour
+            parts = time_str.split(':')
+            try:
+                hour = int(parts[0])
+                ampm = 'AM' if 0 <= hour < 12 else 'PM'
+                return f"{time_str} {ampm}"
+            except Exception:
+                return time_str
+        # Remove Markdown bold (**text**) and italics (*text*)
+        text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+        text = re.sub(r'\*(.*?)\*', r'\1', text)
+        return re.sub(r'\b\d{1,2}:\d{2}(?:\s*[APap][Mm])?\b', repl, text)
+
     for i, message in enumerate(st.session_state.conversation_history):
         if isinstance(message, HumanMessage):
             st.markdown(f"""
             <div class="message-row user">
-              <div class="chat-message user-message">
-                <div>{message.content}</div>
-              </div>
+                <div class="chat-message user-message">
+                    <div>{format_time(message.content)}</div>
+                </div>
             </div>
             """, unsafe_allow_html=True)
         elif isinstance(message, ToolMessage):
-            st.markdown(f"""
-            <div class="tool-message">
-                <strong>Tool:</strong> {message.content}
-            </div>
-            """, unsafe_allow_html=True)
+            continue
         else:
             st.markdown(f"""
             <div class="message-row ai">
-              <div class="chat-message ai-message">
-                <div>{message.content}</div>
-              </div>
+                <div class="chat-message ai-message">
+                    <div>{format_time(message.content)}</div>
+                </div>
             </div>
             """, unsafe_allow_html=True)
 
@@ -357,24 +433,13 @@ def main():
             st.rerun()
 
         st.markdown("---")
-        st.markdown("### Admin Reports")
-        start = st.date_input("Start date")
-        end = st.date_input("End date")
-        if st.button("Generate Admin Report"):
-            # Find and execute build_admin_report tool directly
-            tool_func = None
-            for t in all_tools:
-                if t.name == 'build_admin_report':
-                    tool_func = t
-                    break
-            if tool_func:
-                res = tool_func.invoke({
-                    'start_date': str(start),
-                    'end_date': str(end),
-                })
-                st.success(str(res))
-            else:
-                st.error("build_admin_report tool not found")
+        st.markdown("### System Info")
+        st.markdown("""
+        <div class="feature-card">
+            <h4>Admin Reports</h4>
+            <p>Available via CLI: python -c "from app.agent.tools import build_admin_report; print(build_admin_report.invoke({'start_date': '2025-09-01', 'end_date': '2025-09-30'}))"</p>
+        </div>
+        """, unsafe_allow_html=True)
     
     # Main content area (single column like ChatGPT)
     col1, col2 = st.columns([1, 0.0001])

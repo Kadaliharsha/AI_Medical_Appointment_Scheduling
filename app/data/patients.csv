@@ -1,51 +1,62 @@
-patient_id,first_name,last_name,dob,email,phone,insurance_carrier,member_id,group_id,is_returning
-101,Aarav,Sharma,1985-05-20,aarav.sharma@email.com,9876543210,Star Health,SH12345,GRP101,false
-102,Diya,Patel,1992-11-15,diya.patel@email.com,9876543211,HDFC Ergo,HD54321,GRP102,false
-103,Rohan,Kumar,1978-01-30,rohan.kumar@email.com,9876543212,ICICI Lombard,IC98765,GRP103,false
-104,Saanvi,Gupta,2001-07-22,saanvi.gupta@email.com,9876543213,Bajaj Allianz,BA24680,GRP104,true
-105,Vivaan,Singh,1998-03-12,vivaan.singh@email.com,9876543214,Max Bupa,MB13579,GRP105,false
-106,Ananya,Verma,1995-09-02,ananya.verma@email.com,9876543215,Star Health,SH56789,GRP101,true
-107,Ishaan,Reddy,1989-12-18,ishaan.reddy@email.com,9876543216,HDFC Ergo,HD98765,GRP102,false
-108,Myra,Joshi,2003-04-25,myra.joshi@email.com,9876543217,ICICI Lombard,IC24680,GRP103,true
-109,Advik,Nair,1982-06-08,advik.nair@email.com,9876543218,Bajaj Allianz,BA13579,GRP104,false
-110,Kiara,Menon,1999-10-30,kiara.menon@email.com,9876543219,Max Bupa,MB24680,GRP105,false
-111,Arjun,Chopra,1975-02-14,arjun.chopra@email.com,9876543220,Star Health,SH11223,GRP101,false
-112,Zara,Malik,2000-08-05,zara.malik@email.com,9876543221,HDFC Ergo,HD33445,GRP102,true
-113,Kabir,Saxena,1991-01-20,kabir.saxena@email.com,9876543222,ICICI Lombard,IC55667,GRP103,false
-114,Anika,Bhat,1988-07-11,anika.bhat@email.com,9876543223,Bajaj Allianz,BA77889,GRP104,false
-115,Reyansh,Mittal,1996-05-09,reyansh.mittal@email.com,9876543224,Max Bupa,MB99001,GRP105,true
-116,Pari,Dhillon,1980-11-23,pari.dhillon@email.com,9876543225,Star Health,SH22334,GRP101,false
-117,Ayaan,Yadav,2002-02-28,ayaan.yadav@email.com,9876543226,HDFC Ergo,HD44556,GRP102,true
-118,Eva,Rao,1993-09-17,eva.rao@email.com,9876543227,ICICI Lombard,IC66778,GRP103,false
-119,Zain,Mishra,1979-04-01,zain.mishra@email.com,9876543228,Bajaj Allianz,BA88990,GRP104,false
-120,Samaira,Pandey,1997-12-04,samaira.pandey@email.com,9876543229,Max Bupa,MB11223,GRP105,true
-121,Ahaan,Mehra,1984-10-10,ahaan.mehra@email.com,9876543230,Star Health,SH33445,GRP101,false
-122,Navya,Kaur,1990-06-25,navya.kaur@email.com,9876543231,HDFC Ergo,HD55667,GRP102,false
-123,Vihaan,Choudhary,1976-03-15,vihaan.choudhary@email.com,9876543232,ICICI Lombard,IC77889,GRP103,true
-124,Anvi,Thakur,2004-01-08,anvi.thakur@email.com,9876543233,Bajaj Allianz,BA99001,GRP104,true
-125,Yuvan,Aggarwal,1994-08-19,yuvan.aggarwal@email.com,9876543234,Max Bupa,MB22334,GRP105,false
-126,Amaira,Seth,1981-02-09,amaira.seth@email.com,9876543235,Star Health,SH44556,GRP101,false
-127,Veer,Rajput,1998-11-30,veer.rajput@email.com,9876543236,HDFC Ergo,HD66778,GRP102,false
-128,Sia,Khanna,1986-09-01,sia.khanna@email.com,9876543237,ICICI Lombard,IC88990,GRP103,true
-129,Dhruv,Goel,1973-12-28,dhruv.goel@email.com,9876543238,Bajaj Allianz,BA11223,GRP104,false
-130,Inaaya,Jain,2005-04-14,inaaya.jain@email.com,9876543239,Max Bupa,MB33445,GRP105,true
-131,Shaurya,Das,1992-07-27,shaurya.das@email.com,9876543240,Star Health,SH55667,GRP101,false
-132,Anika,Roy,1983-05-16,anika.roy@email.com,9876543241,HDFC Ergo,HD77889,GRP102,false
-133,Atharv,Ghosh,1995-01-02,atharv.ghosh@email.com,9876543242,ICICI Lombard,IC99001,GRP103,false
-134,Rhea,Bose,1977-03-21,rhea.bose@email.com,9876543243,Bajaj Allianz,BA22334,GRP104,true
-135,Aarush,Sen,2006-06-06,aarush.sen@email.com,9876543244,Max Bupa,MB44556,GRP105,true
-136,Ira,Dutta,1987-10-18,ira.dutta@email.com,9876543245,Star Health,SH66778,GRP101,false
-137,Sai,Banerjee,1993-08-08,sai.banerjee@email.com,9876543246,HDFC Ergo,HD88990,GRP102,false
-138,Nisha,Majumdar,1974-04-04,nisha.majumdar@email.com,9876543247,ICICI Lombard,IC11223,GRP103,true
-139,Krish,Sarkar,2001-09-12,krish.sarkar@email.com,9876543248,Bajaj Allianz,BA33445,GRP104,true
-140,Anvi,Chakraborty,1996-02-19,anvi.chakraborty@email.com,9876543249,Max Bupa,MB55667,GRP105,false
-141,Yash,Gupta,1982-12-01,yash.gupta@email.com,9876543250,Star Health,SH77889,GRP101,false
-142,Mahi,Sharma,1991-05-22,mahi.sharma@email.com,9876543251,HDFC Ergo,HD99001,GRP102,false
-143,Aryan,Patel,1979-11-11,aryan.patel@email.com,9876543252,ICICI Lombard,IC22334,GRP103,false
-144,Aditi,Kumar,2003-07-07,aditi.kumar@email.com,9876543253,Bajaj Allianz,BA44556,GRP104,true
-145,Kian,Singh,1994-01-01,kian.singh@email.com,9876543254,Max Bupa,MB66778,GRP105,false
-146,Fatima,Khan,1985-08-28,fatima.khan@email.com,9876543255,Star Health,SH88990,GRP101,true
-147,Sameer,Ali,1990-03-03,sameer.ali@email.com,9876543256,HDFC Ergo,HD11223,GRP102,false
-148,Aisha,Begum,1976-10-14,aisha.begum@email.com,9876543257,ICICI Lombard,IC33445,GRP103,false
-149,Imran,Hassan,2000-12-25,imran.hassan@email.com,9876543258,Bajaj Allianz,BA55667,GRP104,true
-150,Zoya,Ahmed,1997-06-17,zoya.ahmed@email.com,9876543259,Max Bupa,MB77889,GRP105,false
+patient_id,first_name,last_name,dob,email,phone,insurance_carrier,member_id,group_id,is_returning,preferred_doctor,location,created_at
+101.0,Aarav,Sharma,20-05-1985,aarav.sharma@email.com,9876543210.0,Star Health,SH12345,GRP101,False,,,
+102.0,Diya,Patel,15-11-1992,diya.patel@email.com,9876543211.0,HDFC Ergo,HD54321,GRP102,False,,,
+103.0,Rohan,Kumar,30-01-1978,rohan.kumar@email.com,9876543212.0,ICICI Lombard,IC98765,GRP103,False,,,
+104.0,Saanvi,Gupta,22-07-2001,saanvi.gupta@email.com,9876543213.0,Bajaj Allianz,BA24680,GRP104,True,,,
+105.0,Vivaan,Singh,12-03-1998,vivaan.singh@email.com,9876543214.0,Max Bupa,MB13579,GRP105,False,,,
+106.0,Ananya,Verma,02-09-1995,ananya.verma@email.com,9876543215.0,Star Health,SH56789,GRP101,True,,,
+107.0,Ishaan,Reddy,18-12-1989,ishaan.reddy@email.com,9876543216.0,HDFC Ergo,HD98765,GRP102,False,,,
+108.0,Myra,Joshi,25-04-2003,myra.joshi@email.com,9876543217.0,ICICI Lombard,IC24680,GRP103,True,,,
+109.0,Advik,Nair,08-06-1982,advik.nair@email.com,9876543218.0,Bajaj Allianz,BA13579,GRP104,False,,,
+110.0,Kiara,Menon,30-10-1999,kiara.menon@email.com,9876543219.0,Max Bupa,MB24680,GRP105,False,,,
+111.0,Arjun,Chopra,14-02-1975,arjun.chopra@email.com,9876543220.0,Star Health,SH11223,GRP101,False,,,
+112.0,Zara,Malik,05-08-2000,zara.malik@email.com,9876543221.0,HDFC Ergo,HD33445,GRP102,True,,,
+113.0,Kabir,Saxena,20-01-1991,kabir.saxena@email.com,9876543222.0,ICICI Lombard,IC55667,GRP103,False,,,
+114.0,Anika,Bhat,11-07-1988,anika.bhat@email.com,9876543223.0,Bajaj Allianz,BA77889,GRP104,False,,,
+115.0,Reyansh,Mittal,09-05-1996,reyansh.mittal@email.com,9876543224.0,Max Bupa,MB99001,GRP105,True,,,
+116.0,Pari,Dhillon,23-11-1980,pari.dhillon@email.com,9876543225.0,Star Health,SH22334,GRP101,False,,,
+117.0,Ayaan,Yadav,28-02-2002,ayaan.yadav@email.com,9876543226.0,HDFC Ergo,HD44556,GRP102,True,,,
+118.0,Eva,Rao,17-09-1993,eva.rao@email.com,9876543227.0,ICICI Lombard,IC66778,GRP103,False,,,
+119.0,Zain,Mishra,01-04-1979,zain.mishra@email.com,9876543228.0,Bajaj Allianz,BA88990,GRP104,False,,,
+120.0,Samaira,Pandey,04-12-1997,samaira.pandey@email.com,9876543229.0,Max Bupa,MB11223,GRP105,True,,,
+121.0,Ahaan,Mehra,10-10-1984,ahaan.mehra@email.com,9876543230.0,Star Health,SH33445,GRP101,False,,,
+122.0,Navya,Kaur,25-06-1990,navya.kaur@email.com,9876543231.0,HDFC Ergo,HD55667,GRP102,False,,,
+123.0,Vihaan,Choudhary,15-03-1976,vihaan.choudhary@email.com,9876543232.0,ICICI Lombard,IC77889,GRP103,True,,,
+124.0,Anvi,Thakur,08-01-2004,anvi.thakur@email.com,9876543233.0,Bajaj Allianz,BA99001,GRP104,True,,,
+125.0,Yuvan,Aggarwal,19-08-1994,yuvan.aggarwal@email.com,9876543234.0,Max Bupa,MB22334,GRP105,False,,,
+126.0,Amaira,Seth,09-02-1981,amaira.seth@email.com,9876543235.0,Star Health,SH44556,GRP101,False,,,
+127.0,Veer,Rajput,30-11-1998,veer.rajput@email.com,9876543236.0,HDFC Ergo,HD66778,GRP102,False,,,
+128.0,Sia,Khanna,01-09-1986,sia.khanna@email.com,9876543237.0,ICICI Lombard,IC88990,GRP103,True,,,
+129.0,Dhruv,Goel,28-12-1973,dhruv.goel@email.com,9876543238.0,Bajaj Allianz,BA11223,GRP104,False,,,
+130.0,Inaaya,Jain,14-04-2005,inaaya.jain@email.com,9876543239.0,Max Bupa,MB33445,GRP105,True,,,
+131.0,Shaurya,Das,27-07-1992,shaurya.das@email.com,9876543240.0,Star Health,SH55667,GRP101,False,,,
+132.0,Anika,Roy,16-05-1983,anika.roy@email.com,9876543241.0,HDFC Ergo,HD77889,GRP102,False,,,
+133.0,Atharv,Ghosh,02-01-1995,atharv.ghosh@email.com,9876543242.0,ICICI Lombard,IC99001,GRP103,False,,,
+134.0,Rhea,Bose,21-03-1977,rhea.bose@email.com,9876543243.0,Bajaj Allianz,BA22334,GRP104,True,,,
+135.0,Aarush,Sen,06-06-2006,aarush.sen@email.com,9876543244.0,Max Bupa,MB44556,GRP105,True,,,
+136.0,Ira,Dutta,18-10-1987,ira.dutta@email.com,9876543245.0,Star Health,SH66778,GRP101,False,,,
+137.0,Sai,Banerjee,08-08-1993,sai.banerjee@email.com,9876543246.0,HDFC Ergo,HD88990,GRP102,False,,,
+138.0,Nisha,Majumdar,04-04-1974,nisha.majumdar@email.com,9876543247.0,ICICI Lombard,IC11223,GRP103,True,,,
+139.0,Krish,Sarkar,12-09-2001,krish.sarkar@email.com,9876543248.0,Bajaj Allianz,BA33445,GRP104,True,,,
+140.0,Anvi,Chakraborty,19-02-1996,anvi.chakraborty@email.com,9876543249.0,Max Bupa,MB55667,GRP105,False,,,
+141.0,Yash,Gupta,01-12-1982,yash.gupta@email.com,9876543250.0,Star Health,SH77889,GRP101,False,,,
+142.0,Mahi,Sharma,22-05-1991,mahi.sharma@email.com,9876543251.0,HDFC Ergo,HD99001,GRP102,False,,,
+143.0,Aryan,Patel,11-11-1979,aryan.patel@email.com,9876543252.0,ICICI Lombard,IC22334,GRP103,False,,,
+144.0,Aditi,Kumar,07-07-2003,aditi.kumar@email.com,9876543253.0,Bajaj Allianz,BA44556,GRP104,True,,,
+145.0,Kian,Singh,01-01-1994,kian.singh@email.com,9876543254.0,Max Bupa,MB66778,GRP105,False,,,
+146.0,Fatima,Khan,28-08-1985,fatima.khan@email.com,9876543255.0,Star Health,SH88990,GRP101,True,,,
+147.0,Sameer,Ali,03-03-1990,sameer.ali@email.com,9876543256.0,HDFC Ergo,HD11223,GRP102,False,,,
+148.0,Aisha,Begum,14-10-1976,aisha.begum@email.com,9876543257.0,ICICI Lombard,IC33445,GRP103,False,,,
+149.0,Imran,Hassan,25-12-2000,imran.hassan@email.com,9876543258.0,Bajaj Allianz,BA55667,GRP104,True,,,
+150.0,Zoya,Ahmed,17-06-1997,zoya.ahmed@email.com,9876543259.0,Max Bupa,MB77889,GRP105,False,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,Priya,Sharma,1995-03-22,kadali.hrv@gmail.com,,,,,,Dr. Verma,Main Clinic,2025-09-05 17:47:23
+,Dolly,,2003-07-02,kadali.hrv540@gmail.com,,,,,,Dr. Sharma,Main Clinic,2025-09-05 17:56:38
+,Bob,,1995-03-22,kadali.hrv540@gmail.com,,,,,,Dr. Verma,Main Clinic,2025-09-06 02:12:07
+,Sharma,Sharma,1995-03-21,206m1a0540@gmail.com,,,,,,Dr. Sharma,Main Clinic,2025-09-06 02:21:24
+,Harsha,Sharma,1995-03-22,kadali.hrv@gmail.com,,,,,,Dr. Sharma,Main Clinic,2025-09-06 02:44:20
